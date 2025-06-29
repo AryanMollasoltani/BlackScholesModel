@@ -74,7 +74,7 @@ class BlackScholesModel:
         model = BlackScholesModel(X, self.K, Y, self.r, self.t)
         calls = model.call_price()
         puts = model.put_price()
-        return X, Y, calls, puts
+        return s_vals, sig_vals, calls, puts
 
     def thetas(self):
         term_one = -((self.S*self.sigma*norm.pdf(self.d_1))/(2*np.sqrt(self.t)))
@@ -97,8 +97,12 @@ class BlackScholesModel:
         # Sensitivity to Interest Rates(amount of price change to 1% change in r)
         rho_call = self.K*self.t*np.exp(-self.r*self.t)*norm.cdf(self.d_2)
         rho_put = -self.K*self.t*np.exp(-self.r*self.t)*norm.cdf(-self.d_2)
+        # Elasticity
+        elas_call = (delta_call*self.S)/self.c_p
+        elas_put = (delta_call*self.S)/self.p_p
+
         if parameter is None:
-            an = [delta_call, delta_put, gamma, vega, rho_call, rho_put]
+            an = [delta_call, delta_put, gamma, vega, rho_call, rho_put, elas_call, elas_put]
             return an
         elif parameter == 'd':
             return delta_call, delta_put
@@ -109,7 +113,7 @@ class BlackScholesModel:
         elif parameter == 'r':
             return rho_call, rho_put
         else:
-            an_o = [delta_call, delta_put, gamma, vega, rho_call, rho_put]
+            an_o = [delta_call, delta_put, gamma, vega, rho_call, rho_put, elas_call, elas_put]
             return an_o
 
     def summary(self, market_price_at_expiry): # maybe unnecessary
@@ -126,14 +130,14 @@ class BlackScholesModel:
         statline_put.append(profit_put)
         return statline_call, statline_put
 
-    def theo_call_pnl(self, market_price):
+    def theo_call_pnl(self, market_price_at_expiry):
         model = BlackScholesModel(self.S, self.K, self.sigma, self.r, self.t)
-        pnl = market_price - model.breakeven_call()
+        pnl = market_price_at_expiry - model.breakeven_call()
         return pnl
 
-    def theo_put_pnl(self, market_price):
+    def theo_put_pnl(self, market_price_at_expiry):
         model = BlackScholesModel(self.S, self.K, self.sigma, self.r, self.t)
-        pnl = model.breakeven_put() - market_price
+        pnl = model.breakeven_put() - market_price_at_expiry
         return pnl
 
     def theo_pnl_chart(self, size=10, min_sig=None, max_sig=None, min_mp=None, max_mp=None):
@@ -152,14 +156,20 @@ class BlackScholesModel:
         model = BlackScholesModel(self.S, self.K, Y, self.r, self.t)
         call_pnl = model.theo_call_pnl(market_prices_at_expiry)
         put_pnl = model.theo_put_pnl(market_prices_at_expiry)
-        return X, Y, call_pnl, put_pnl
+        return market_prices_at_expiry, sig_vals, call_pnl, put_pnl
         # Remember we don't actually buy the option if the pnl is negative but this is not highlighted in model.
 
     def call_trade_edge(self, market_maker_quote):
         return self.c_p - market_maker_quote # the mispricing
 
+    def prac_call_pnl(self, market_maker_quote, market_prices_at_expiry):
+        return market_prices_at_expiry - (self.K + market_maker_quote)
+
     def put_trade_edge(self, market_maker_quote): # not as important as call
         return market_maker_quote - self.p_p
+
+    def prac_put_pnl(self, market_maker_quote, market_prices_at_expiry):
+        return (self.K + market_maker_quote) - market_prices_at_expiry
 
     def theta_decay_graph(self):
         T = np.linspace(1/365, self.t, int(self.t*365))
@@ -189,9 +199,9 @@ class BlackScholesModel:
         # if mean is too low, check with the theoretical pnl chart which explain even though the market is on our
         # side we don't profit much(remember the model doesn't account for extra fess)
 
-Model = BlackScholesModel(62, 60, 0.32, 0.04, 40/365)
-print(Model.call_price())
-print(Model.c_pnl_edge_simul(3.25, 100, 10000)[1])
+#Model = BlackScholesModel(62, 60, 0.32, 0.04, 40/365)
+#print(Model.call_price())
+#print(Model.c_pnl_edge_simul(3.25, 100, 10000)[1])
 
 #def gbm_path(self, n_steps, mu=None):
 #    if mu is None:
